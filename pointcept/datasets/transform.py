@@ -36,6 +36,8 @@ class Collect(object):
         self.kwargs = kwargs
 
     def __call__(self, data_dict):
+        # print('collect')
+        # print(data_dict.keys())
         data = dict()
         if isinstance(self.keys, str):
             self.keys = [self.keys]
@@ -59,12 +61,13 @@ class Copy(object):
 
     def __call__(self, data_dict):
         for key, value in self.keys_dict.items():
-            if isinstance(data_dict[key], np.ndarray):
-                data_dict[value] = data_dict[key].copy()
-            elif isinstance(data_dict[key], torch.Tensor):
-                data_dict[value] = data_dict[key].clone().detach()
+            if isinstance(self.keys_dict[key], np.ndarray):
+                data_dict[key] = self.keys_dict[key].copy()
+            elif isinstance(self.keys_dict[key], torch.Tensor):
+                data_dict[key] = self.keys_dict[key].clone().detach()
             else:
-                data_dict[value] = copy.deepcopy(data_dict[key])
+                data_dict[key] = copy.deepcopy(self.keys_dict[key])
+        # print(f'copy result {data_dict.keys()}')
         return data_dict
 
 
@@ -122,9 +125,13 @@ class NormalizeCoord(object):
     def __call__(self, data_dict):
         if "coord" in data_dict.keys():
             # modified from pointnet2
-            centroid = np.mean(data_dict["coord"], axis=0)
+            
+            
+            
+            centroid = torch.mean(data_dict["coord"], dim=0)
+            
             data_dict["coord"] -= centroid
-            m = np.max(np.sqrt(np.sum(data_dict["coord"] ** 2, axis=1)))
+            m = torch.max(torch.sqrt(torch.sum(data_dict["coord"] ** 2, dim=1)))
             data_dict["coord"] = data_dict["coord"] / m
         return data_dict
 

@@ -10,6 +10,7 @@ import torch
 import torch.distributed as dist
 import pointops
 from uuid import uuid4
+from torchmetrics.functional.classification import multiclass_accuracy
 
 import pointcept.utils.comm as comm
 from pointcept.utils.misc import intersection_and_union_gpu
@@ -100,6 +101,65 @@ class ClsEvaluator(HookBase):
         self.trainer.logger.info(
             "Best {}: {:.4f}".format("allAcc", self.trainer.best_metric_value)
         )
+
+
+
+@HOOKS.register_module()
+class ClassificationEvaluator(HookBase):
+    def after_epoch(self):
+        if self.trainer.cfg.evaluate:
+            self.eval()
+
+    def eval(self):
+        self.trainer.logger.info(">>>>>>>>>>>>>>>> Start Evaluation >>>>>>>>>>>>>>>>")
+        self.trainer.model.eval()
+        
+        accuracy = []
+        for i, input_dict in enumerate(self.trainer.val_loader):
+            for key in input_dict.keys():
+                if isinstance(input_dict[key], torch.Tensor):
+                    input_dict[key] = input_dict[key].cuda(non_blocking=True)
+            with torch.no_grad():
+                output_dict = self.trainer.model(input_dict)
+            output = output_dict["cls_logits"]
+            loss = output_dict["loss"]
+            pred = output.max(1)[1]
+            label = input_dict["category"]
+            
+            # print(pred)
+            # print(label)
+            accuracy.append(multiclass_accuracy(pred, label, num_classes=10).cpu().numpy())
+            
+            # self.trainer.storage.put_scalar("val_acc", accuracy)
+            self.trainer.storage.put_scalar("val_loss", loss.item())
+            self.trainer.logger.info(
+                "Test: [{iter}/{max_iter}] "
+                "Loss {loss:.4f} ".format(
+                    iter=i + 1, max_iter=len(self.trainer.val_loader), loss=loss.item()
+                )
+            )
+            
+            
+        loss_avg = self.trainer.storage.history("val_loss").avg
+        acc_avg = np.mean(accuracy)
+        self.trainer.logger.info(
+            f"Val result acc: {acc_avg:.3f}"
+        )
+        
+        current_epoch = self.trainer.epoch + 1
+        if self.trainer.writer is not None:
+            self.trainer.writer.add_scalar("val/loss", loss_avg, current_epoch)
+            self.trainer.writer.add_scalar("val/accuracy", acc_avg, current_epoch)
+        
+        self.trainer.logger.info("<<<<<<<<<<<<<<<<< End Evaluation <<<<<<<<<<<<<<<<<")
+        self.trainer.comm_info["current_metric_value"] = acc_avg  # save for saver
+        self.trainer.comm_info["current_metric_name"] = "acc_avg"  # save for saver
+
+    def after_train(self):
+        # self.trainer.logger.info(
+        #     "Best {}: {:.4f}".format("allAcc", self.trainer.best_metric_value)
+        # )
+        pass
 
 
 @HOOKS.register_module()

@@ -21,23 +21,40 @@ def collate_fn(batch):
         raise TypeError(f"{batch.dtype} is not supported.")
 
     if isinstance(batch[0], torch.Tensor):
+        # print('1')
         return torch.cat(list(batch))
     elif isinstance(batch[0], str):
+        # print('2')
         # str is also a kind of Sequence, judgement should before Sequence
         return list(batch)
     elif isinstance(batch[0], Sequence):
+        # print('3')
         for data in batch:
             data.append(torch.tensor([data[0].shape[0]]))
         batch = [collate_fn(samples) for samples in zip(*batch)]
         batch[-1] = torch.cumsum(batch[-1], dim=0).int()
         return batch
     elif isinstance(batch[0], Mapping):
+        # print('4')
+        # offsets = torch.tensor([point['coord'].shape[0] for point in batch])
+        # offsets = torch.cumsum(offsets, dim=0)
+        # feats = torch.cat([point[i] for i in ['coord', 'normal']], dim=1)
+        
         batch = {key: collate_fn([d[key] for d in batch]) for key in batch[0]}
         for key in batch.keys():
             if "offset" in key:
+                # print('OFfset')
+                # print(batch[key])
                 batch[key] = torch.cumsum(batch[key], dim=0)
+            # print(batch[key])
+        
+        # batch['offset'] = offsets
+        # batch['grid_size'] = 0.06
+        # batch['feat'] = feats
+        
         return batch
     else:
+        # print('5')
         return default_collate(batch)
 
 

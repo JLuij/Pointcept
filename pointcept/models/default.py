@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 
 from pointcept.models.losses import build_criteria
 from pointcept.models.utils.structure import Point
@@ -91,10 +92,19 @@ class DefaultClassifier(nn.Module):
             nn.Dropout(p=0.5),
             nn.Linear(128, num_classes),
         )
+        self.pool = nn.AdaptiveAvgPool1d(1)
 
     def forward(self, input_dict):
         feat = self.backbone(input_dict)
-        cls_logits = self.cls_head(feat)
+
+        # pooled_feature = self.pool(feat['feat'].permute(1,0)).permute(1,0)
+        
+        feats_list = batch_to_indiv(feat['feat'], feat['offset'])
+        pooled_feature = [self.pool(x.permute(1,0)).permute(1,0) for x in feats_list]
+        batched_features = torch.cat(pooled_feature, dim=0)
+        # print(batched_features.shape)
+        
+        cls_logits = self.cls_head(batched_features)
         if self.training:
             loss = self.criteria(cls_logits, input_dict["category"])
             return dict(loss=loss)
@@ -103,3 +113,12 @@ class DefaultClassifier(nn.Module):
             return dict(loss=loss, cls_logits=cls_logits)
         else:
             return dict(cls_logits=cls_logits)
+
+
+def batch_to_indiv(batched_attribute, batch_offset):
+    original_offset = torch.diff(batch_offset, prepend=torch.tensor([0]).to(batch_offset.device))
+    original_offset = original_offset.tolist()
+    
+    # Gives n tensors of different sizes
+    splits = torch.split(batched_attribute, original_offset)
+    return splits

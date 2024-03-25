@@ -40,9 +40,13 @@ class Point(Dict):
         super().__init__(*args, **kwargs)
         # If one of "offset" or "batch" do not exist, generate by the existing one
         if "batch" not in self.keys() and "offset" in self.keys():
+            # print('adding batch')
             self["batch"] = offset2batch(self.offset)
         elif "offset" not in self.keys() and "batch" in self.keys():
+            # print('adding offset')
             self["offset"] = batch2offset(self.batch)
+        # else:
+            # print('added nothing')
 
     def serialization(self, order="z", depth=None, shuffle_orders=False):
         """
@@ -57,8 +61,10 @@ class Point(Dict):
             # dict(type="Copy", keys_dict={"grid_size": 0.01}),
             # (adjust `grid_size` to what your want)
             assert {"grid_size", "coord"}.issubset(self.keys())
+            
+            # grid_size is batch-ified, so take the first element (they're all the same)
             self["grid_coord"] = torch.div(
-                self.coord - self.coord.min(0)[0], self.grid_size, rounding_mode="trunc"
+                self.coord - self.coord.min(0)[0], self.grid_size[0], rounding_mode="trunc"
             ).int()
 
         if depth is None:

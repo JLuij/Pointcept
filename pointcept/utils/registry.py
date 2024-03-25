@@ -40,9 +40,13 @@ def build_from_cfg(cfg, registry, default_args=None):
         for name, value in default_args.items():
             args.setdefault(name, value)
 
+    # print('registry')
+    # print(registry)
     obj_type = args.pop("type")
     if isinstance(obj_type, str):
         obj_cls = registry.get(obj_type)
+        # print(obj_type)
+        # print(obj_cls)
         if obj_cls is None:
             raise KeyError(f"{obj_type} is not in the {registry.name} registry")
     elif inspect.isclass(obj_type):

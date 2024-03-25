@@ -250,6 +250,13 @@ class Trainer(TrainerBase):
             drop_last=True,
             persistent_workers=True,
         )
+        # onepoint = next(iter(train_loader))
+        # print(train_loader)
+        # print(point_collate_fn)
+        # print(onepoint.keys())
+        # print(self.cfg.batch_size_per_gpu)
+        # print(self.cfg.num_worker_per_gpu)
+        
         return train_loader
 
     def build_val_loader(self):
